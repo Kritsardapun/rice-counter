@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌾 เครื่องนับเม็ดข้าวสาร</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #121212; color: white; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 15px; box-shadow: 0px 4px 15px rgba(0,0,0,0.5); }
+        .counter-box { font-size: 22px; font-weight: bold; margin: 15px 0; color: #e0e0e0; }
+        #counterDisplay { color: #28a745; font-size: 35px; }
+        canvas { width: 100%; max-width: 320px; border-radius: 10px; background: #000; display: block; margin: auto; border: 2px solid #333; }
+        button { padding: 15px 20px; font-size: 18px; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; max-width: 320px; margin-top: 15px; }
+        #status { color: #888; font-size: 14px; margin-top: 5px; }
+    </style>
+    <script async src="https://docs.opencv.org/4.5.4/opencv.js" type="text/javascript" id="opencv-js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h2>🌾 เครื่องนับเม็ดข้าวสาร</h2>
+    <div class="counter-box">จำนวนข้าวที่พบ: <span id="counterDisplay">0</span> เม็ด</div>
+    <video id="videoInput" width="320" height="240" autoplay playsinline style="display:none;"></video>
+    <canvas id="canvasOutput" width="320" height="240"></canvas>
+    <div id="status">กำลังโหลดระบบนับข้าว (OpenCV)...</div>
+    <button id="startBtn" disabled style="background-color: #555;">กรุณารอสักครู่...</button>
+</div>
+
+<script>
+// ตรวจสอบว่า OpenCV โดนโหลดเสร็จหรือยัง
+document.getElementById('opencv-js').addEventListener('load', function() {
+    let btn = document.getElementById('startBtn');
+    btn.disabled = false;
+    btn.style.backgroundColor = "#28a745";
+    btn.innerText = "เปิดกล้องนับข้าว";
+    document.getElementById('status').innerText = "ระบบพร้อมใช้งานแล้ว";
+});
+
+document.getElementById('startBtn').addEventListener('click', openCamera);
+
+function openCamera() {
+    let video = document.getElementById('videoInput');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+    .then(function(stream) {
+        video.srcObject = stream;
+        video.play();
+        setTimeout(processVideo, 1000);
+    })
+    .catch(function(err) {
+        alert("ไม่สามารถเปิดกล้องได้ ชี้แจง: " + err);
+    });
+}
+
+function processVideo() {
+    let video = document.getElementById('videoInput');
+    if (video.paused || video.ended) {
+        requestAnimationFrame(processVideo);
+        return;
+    }
+
+    let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+    let dst = new cv.Mat();
+    let gray = new cv.Mat();
+    let contours = new cv.MatVector();
+    let hierarchy = new cv.Mat();
+    
+    let cap = new cv.VideoCapture(video);
+    cap.read(src);
+    
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+    cv.threshold(gray, dst, 130, 255, cv.THRESH_BINARY);
+    cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    
+    let riceCount = 0;
+    for (let i = 0; i < contours.size(); ++i) {
+        let cnt = contours.get(i);
+        let area = cv.contourArea(cnt);
+        
+        if (area > 20 && area < 800) { 
+            riceCount++;
+            let rect = cv.boundingRect(cnt);
+            let point1 = new cv.Point(rect.x, rect.y);
+            let point2 = new cv.Point(rect.x + rect.width, rect.y + rect.height);
+            cv.rectangle(src, point1, point2, [0, 255, 0, 255], 2);
+        }
+    }
+    
+    document.getElementById('counterDisplay').innerText = riceCount;
+    cv.imshow('canvasOutput', src);
+    
+    src.delete(); dst.delete(); gray.delete(); contours.delete(); hierarchy.delete();
+    requestAnimationFrame(processVideo);
+}
+</script>
+
+</body>
+</html>
