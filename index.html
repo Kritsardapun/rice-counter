@@ -1,96 +1,528 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌾 ระบบนับเมล็ดข้าวสาร</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #121212; color: white; padding: 20px; }
-        .container { max-width: 400px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 15px; box-shadow: 0px 4px 15px rgba(0,0,0,0.5); }
-        .counter-box { font-size: 22px; font-weight: bold; margin: 15px 0; color: #e0e0e0; }
-        #counterDisplay { color: #28a745; font-size: 35px; }
-        canvas { width: 100%; max-width: 320px; border-radius: 10px; background: #000; display: block; margin: auto; border: 2px solid #333; }
-        button { padding: 15px 20px; font-size: 18px; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; max-width: 320px; margin-top: 15px; }
-        #status { color: #888; font-size: 14px; margin-top: 5px; }
-    </style>
-    <script async src="https://docs.opencv.org/4.5.4/opencv.js" type="text/javascript" id="opencv-js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>🌾 AI Rice Counter PRO</title>
+
+<style>
+
+body{
+    margin:0;
+    padding:20px;
+    background:#111;
+    color:white;
+    font-family:Arial;
+    text-align:center;
+}
+
+.container{
+    max-width:420px;
+    margin:auto;
+    background:#1e1e1e;
+    border-radius:20px;
+    padding:20px;
+    box-shadow:0 0 20px rgba(0,0,0,0.5);
+}
+
+h2{
+    margin-top:5px;
+}
+
+.counter{
+    font-size:28px;
+    margin:15px 0;
+    font-weight:bold;
+}
+
+#counterDisplay{
+    color:#00ff66;
+    font-size:45px;
+}
+
+canvas{
+    width:100%;
+    max-width:360px;
+    border-radius:15px;
+    border:2px solid #333;
+    background:black;
+}
+
+button{
+    width:100%;
+    padding:15px;
+    font-size:20px;
+    font-weight:bold;
+    border:none;
+    border-radius:10px;
+    background:#28a745;
+    color:white;
+    margin-top:15px;
+}
+
+#status{
+    color:#999;
+    margin-top:10px;
+}
+
+</style>
+
+<script async
+src="https://docs.opencv.org/4.5.4/opencv.js"
+type="text/javascript"
+id="opencvjs">
+</script>
+
 </head>
+
 <body>
 
 <div class="container">
-    <h2>🌾 ระบบนับเมล็ดข้าวสาร</h2>
-    <div class="counter-box">จำนวนเมล็ดข้าวที่พบ: <span id="counterDisplay">0</span> เม็ด</div>
-    <video id="videoInput" width="320" height="240" autoplay playsinline style="display:none;"></video>
-    <canvas id="canvasOutput" width="320" height="240"></canvas>
-    <div id="status">กำลังโหลดระบบนับข้าว (OpenCV)...</div>
-    <button id="startBtn" disabled style="background-color: #555;">กรุณารอสักครู่...</button>
+
+    <h2>🌾 ระบบนับเมล็ดข้าว PRO</h2>
+
+    <div class="counter">
+        จำนวนเมล็ด:
+        <span id="counterDisplay">0</span>
+    </div>
+
+    <video
+        id="videoInput"
+        autoplay
+        playsinline
+        style="display:none;">
+    </video>
+
+    <canvas id="canvasOutput"></canvas>
+
+    <div id="status">
+        กำลังโหลด OpenCV...
+    </div>
+
+    <button id="startBtn" disabled>
+        กรุณารอสักครู่...
+    </button>
+
 </div>
 
 <script>
-// ตรวจสอบว่า OpenCV โดนโหลดเสร็จหรือยัง
-document.getElementById('opencv-js').addEventListener('load', function() {
-    let btn = document.getElementById('startBtn');
+
+let streaming = false;
+
+document.getElementById('opencvjs')
+.addEventListener('load', ()=>{
+
+    let btn =
+        document.getElementById('startBtn');
+
     btn.disabled = false;
-    btn.style.backgroundColor = "#28a745";
-    btn.innerText = "เปิดกล้องนับข้าว";
-    document.getElementById('status').innerText = "ระบบพร้อมใช้งานแล้ว";
+
+    btn.innerText = "📷 เปิดกล้อง";
+
+    document.getElementById('status')
+    .innerText = "ระบบพร้อมใช้งาน";
+
 });
 
-document.getElementById('startBtn').addEventListener('click', openCamera);
 
-function openCamera() {
-    let video = document.getElementById('videoInput');
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
-    .then(function(stream) {
+document.getElementById('startBtn')
+.addEventListener('click', openCamera);
+
+
+async function openCamera(){
+
+    if(streaming) return;
+
+    try{
+
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
+
+                video:{
+                    facingMode:"environment",
+                    width:{ideal:1280},
+                    height:{ideal:720}
+                },
+
+                audio:false
+
+            });
+
+        const video =
+            document.getElementById('videoInput');
+
         video.srcObject = stream;
-        video.play();
-        setTimeout(processVideo, 1000);
-    })
-    .catch(function(err) {
-        alert("ไม่สามารถเปิดกล้องได้ ชี้แจง: " + err);
-    });
+
+        video.onloadedmetadata = ()=>{
+
+            video.play();
+
+            streaming = true;
+
+            requestAnimationFrame(processVideo);
+
+        };
+
+    }
+    catch(err){
+
+        alert(err);
+
+    }
+
 }
 
-function processVideo() {
-    let video = document.getElementById('videoInput');
-    if (video.paused || video.ended) {
-        requestAnimationFrame(processVideo);
+
+
+function processVideo(){
+
+    if(!streaming){
         return;
     }
 
-    let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
-    let dst = new cv.Mat();
-    let gray = new cv.Mat();
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
-    
-    let cap = new cv.VideoCapture(video);
+    const video =
+        document.getElementById('videoInput');
+
+
+
+    // =========================
+    // อ่านภาพ
+    // =========================
+
+    let src =
+        new cv.Mat(
+            video.videoHeight,
+            video.videoWidth,
+            cv.CV_8UC4
+        );
+
+    let cap =
+        new cv.VideoCapture(video);
+
     cap.read(src);
-    
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-    cv.threshold(gray, dst, 130, 255, cv.THRESH_BINARY);
-    cv.findContours(dst, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-    
+
+
+
+    // =========================
+    // ROI
+    // =========================
+
+    let roiX =
+        Math.floor(src.cols * 0.15);
+
+    let roiY =
+        Math.floor(src.rows * 0.15);
+
+    let roiW =
+        Math.floor(src.cols * 0.7);
+
+    let roiH =
+        Math.floor(src.rows * 0.7);
+
+    let roiRect =
+        new cv.Rect(roiX, roiY, roiW, roiH);
+
+    let roi = src.roi(roiRect);
+
+
+
+    // =========================
+    // grayscale
+    // =========================
+
+    let gray = new cv.Mat();
+
+    cv.cvtColor(
+        roi,
+        gray,
+        cv.COLOR_RGBA2GRAY
+    );
+
+
+
+    // =========================
+    // blur
+    // =========================
+
+    cv.GaussianBlur(
+        gray,
+        gray,
+        new cv.Size(5,5),
+        0
+    );
+
+
+
+    // =========================
+    // adaptive threshold
+    // =========================
+
+    let thresh = new cv.Mat();
+
+    cv.adaptiveThreshold(
+
+        gray,
+        thresh,
+        255,
+
+        cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+
+        cv.THRESH_BINARY_INV,
+
+        15,
+        3
+
+    );
+
+
+
+    // =========================
+    // morphology
+    // =========================
+
+    let kernel =
+        cv.getStructuringElement(
+            cv.MORPH_ELLIPSE,
+            new cv.Size(3,3)
+        );
+
+    cv.morphologyEx(
+        thresh,
+        thresh,
+        cv.MORPH_OPEN,
+        kernel
+    );
+
+
+
+    // =========================
+    // Distance Transform
+    // =========================
+
+    let dist = new cv.Mat();
+
+    cv.distanceTransform(
+        thresh,
+        dist,
+        cv.DIST_L2,
+        5
+    );
+
+
+
+    // normalize
+    cv.normalize(
+        dist,
+        dist,
+        0,
+        1.0,
+        cv.NORM_MINMAX
+    );
+
+
+
+    // =========================
+    // threshold distance
+    // =========================
+
+    let distBinary = new cv.Mat();
+
+    cv.threshold(
+        dist,
+        distBinary,
+        0.25,
+        1.0,
+        cv.THRESH_BINARY
+    );
+
+
+
+    // convert
+    distBinary.convertTo(
+        distBinary,
+        cv.CV_8U,
+        255
+    );
+
+
+
+    // =========================
+    // find contours
+    // =========================
+
+    let contours =
+        new cv.MatVector();
+
+    let hierarchy =
+        new cv.Mat();
+
+    cv.findContours(
+
+        distBinary,
+
+        contours,
+
+        hierarchy,
+
+        cv.RETR_EXTERNAL,
+
+        cv.CHAIN_APPROX_SIMPLE
+
+    );
+
+
+
+    // =========================
+    // draw ROI
+    // =========================
+
+    cv.rectangle(
+
+        src,
+
+        new cv.Point(roiX, roiY),
+
+        new cv.Point(
+            roiX + roiW,
+            roiY + roiH
+        ),
+
+        [255,0,0,255],
+
+        2
+
+    );
+
+
+
+    // =========================
+    // count rice
+    // =========================
+
     let riceCount = 0;
-    for (let i = 0; i < contours.size(); ++i) {
-        let cnt = contours.get(i);
-        let area = cv.contourArea(cnt);
-        
-        if (area > 20 && area < 800) { 
+
+    for(let i=0; i<contours.size(); i++){
+
+        let cnt =
+            contours.get(i);
+
+        let area =
+            cv.contourArea(cnt);
+
+        let rect =
+            cv.boundingRect(cnt);
+
+        let ratio =
+            rect.width / rect.height;
+
+
+
+        // =====================
+        // filter
+        // =====================
+
+        if(
+
+            area > 15 &&
+            area < 1500 &&
+
+            ratio > 0.2 &&
+            ratio < 5 &&
+
+            rect.width > 4 &&
+            rect.height > 4
+
+        ){
+
             riceCount++;
-            let rect = cv.boundingRect(cnt);
-            let point1 = new cv.Point(rect.x, rect.y);
-            let point2 = new cv.Point(rect.x + rect.width, rect.y + rect.height);
-            cv.rectangle(src, point1, point2, [0, 255, 0, 255], 2);
+
+
+
+            // draw rectangle
+
+            let p1 =
+                new cv.Point(
+                    rect.x + roiX,
+                    rect.y + roiY
+                );
+
+            let p2 =
+                new cv.Point(
+                    rect.x + rect.width + roiX,
+                    rect.y + rect.height + roiY
+                );
+
+            cv.rectangle(
+
+                src,
+
+                p1,
+
+                p2,
+
+                [0,255,0,255],
+
+                2
+
+            );
+
         }
+
+        cnt.delete();
+
     }
-    
-    document.getElementById('counterDisplay').innerText = riceCount;
-    cv.imshow('canvasOutput', src);
-    
-    src.delete(); dst.delete(); gray.delete(); contours.delete(); hierarchy.delete();
+
+
+
+    // =========================
+    // show count
+    // =========================
+
+    document.getElementById('counterDisplay')
+    .innerText = riceCount;
+
+
+
+    // =========================
+    // show image
+    // =========================
+
+    cv.imshow(
+        'canvasOutput',
+        src
+    );
+
+
+
+    // =========================
+    // cleanup
+    // =========================
+
+    src.delete();
+
+    roi.delete();
+
+    gray.delete();
+
+    thresh.delete();
+
+    dist.delete();
+
+    distBinary.delete();
+
+    contours.delete();
+
+    hierarchy.delete();
+
+    kernel.delete();
+
+
+
     requestAnimationFrame(processVideo);
+
 }
+
 </script>
 
 </body>
